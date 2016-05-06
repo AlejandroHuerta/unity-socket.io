@@ -28,6 +28,7 @@
 #endregion
 
 //#define SOCKET_IO_DEBUG			// Uncomment this for debug
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -138,8 +139,8 @@ namespace SocketIO
 				}
 			}
 
-			if(wsConnected != ws.IsConnected){
-				wsConnected = ws.IsConnected;
+			if(wsConnected != ws.IsAlive){
+				wsConnected = ws.IsAlive;
 				if(wsConnected){
 					EmitEvent("connect");
 				} else {
@@ -167,10 +168,6 @@ namespace SocketIO
 		#endregion
 
 		#region Public Interface
-
-        public void SetHeader(string header, string value) {
-            ws.SetHeader(header, value);
-        }
 		
 		public void Connect()
 		{
@@ -225,7 +222,7 @@ namespace SocketIO
 			EmitMessage(-1, string.Format("[\"{0}\"]", ev));
 		}
 
-		public void Emit(string ev, Action<JSONObject> action)
+		public void Emit(string ev, Action<JToken> action)
 		{
 			EmitMessage(++packetId, string.Format("[\"{0}\"]", ev));
 			ackList.Add(new Ack(packetId, action));
@@ -236,12 +233,12 @@ namespace SocketIO
 			EmitMessage(-1, string.Format("[\"{0}\",\"{1}\"]", ev, str));
 		}
 
-		public void Emit(string ev, JSONObject data)
+		public void Emit(string ev, JObject data)
 		{
 			EmitMessage(-1, string.Format("[\"{0}\",{1}]", ev, data));
 		}
 
-		public void Emit(string ev, JSONObject data, Action<JSONObject> action)
+		public void Emit(string ev, JObject data, Action<JToken> action)
 		{
 			EmitMessage(++packetId, string.Format("[\"{0}\",{1}]", ev, data));
 			ackList.Add(new Ack(packetId, action));
@@ -255,12 +252,11 @@ namespace SocketIO
 		{
 			WebSocket webSocket = (WebSocket)obj;
 			while(connected){
-				if(webSocket.IsConnected){
-					Thread.Sleep(reconnectDelay);
-				} else {
-					webSocket.Connect();
-				}
-			}
+				if(!webSocket.IsAlive) {
+                    webSocket.Connect();
+                }
+                Thread.Sleep(reconnectDelay);
+            }
 			webSocket.Close();
 		}
 
@@ -284,7 +280,7 @@ namespace SocketIO
 					EmitPacket(new Packet(EnginePacketType.PING));
 					pingStart = DateTime.Now;
 					
-					while(webSocket.IsConnected && thPinging && (DateTime.Now.Subtract(pingStart).TotalSeconds < timeoutMilis)){
+					while(webSocket.IsAlive && thPinging && (DateTime.Now.Subtract(pingStart).TotalSeconds < timeoutMilis)){
 						Thread.Sleep(200);
 					}
 					
@@ -299,12 +295,12 @@ namespace SocketIO
 
 		private void EmitMessage(int id, string raw)
 		{
-			EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.EVENT, 0, "/", id, new JSONObject(raw)));
+			EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.EVENT, 0, "/", id, JToken.Parse(raw)));
 		}
 
 		private void EmitClose()
 		{
-			EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.DISCONNECT, 0, "/", -1, new JSONObject("")));
+			EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.DISCONNECT, 0, "/", -1, JValue.CreateNull()));
 			EmitPacket(new Packet(EnginePacketType.CLOSE));
 		}
 
@@ -323,6 +319,14 @@ namespace SocketIO
 			}
 		}
 
+        private void EmitAck(int id) {
+            #if SOCKET_IO_DEBUG
+			debugMethod.Invoke("[SocketIO] Send Ack id: " + id);
+			#endif
+
+            EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.ACK, 0, "/", id, JValue.CreateNull()));
+        }
+
 		private void OnOpen(object sender, EventArgs e)
 		{
 			EmitEvent("open");
@@ -333,23 +337,27 @@ namespace SocketIO
 			#if SOCKET_IO_DEBUG
 			debugMethod.Invoke("[SocketIO] Raw message: " + e.Data);
 			#endif
-			Packet packet = decoder.Decode(e);
-
-			switch (packet.enginePacketType) {
-				case EnginePacketType.OPEN: 	HandleOpen(packet);		break;
-				case EnginePacketType.CLOSE: 	EmitEvent("close");		break;
-				case EnginePacketType.PING:		HandlePing();	   		break;
-				case EnginePacketType.PONG:		HandlePong();	   		break;
-				case EnginePacketType.MESSAGE: 	HandleMessage(packet);	break;
-			}
+			
+            
+            decoder.Add(e, OnDecode);
 		}
+
+        private void OnDecode(Packet packet) {
+            switch (packet.enginePacketType) {
+                case EnginePacketType.OPEN: HandleOpen(packet); break;
+                case EnginePacketType.CLOSE: EmitEvent("close"); break;
+                case EnginePacketType.PING: HandlePing(); break;
+                case EnginePacketType.PONG: HandlePong(); break;
+                case EnginePacketType.MESSAGE: HandleMessage(packet); break;
+            }
+        }
 
 		private void HandleOpen(Packet packet)
 		{
 			#if SOCKET_IO_DEBUG
 			debugMethod.Invoke("[SocketIO] Socket.IO sid: " + packet.json["sid"].str);
 			#endif
-			sid = packet.json["sid"].str;
+			sid = packet.json["sid"].ToString();
 			EmitEvent("open");
 		}
 
@@ -380,15 +388,21 @@ namespace SocketIO
 				#endif
 			}
 
-			if (packet.socketPacketType == SocketPacketType.EVENT) {
+			if (packet.socketPacketType == SocketPacketType.EVENT || packet.socketPacketType == SocketPacketType.BINARY_EVENT) {
 				SocketIOEvent e = parser.Parse(packet.json);
 				lock(eventQueueLock){ eventQueue.Enqueue(e); }
+                if (packet.id > 0) {
+                    EmitAck(packet.id);
+                }
 			}
 		}
 
 		private void OnError(object sender, ErrorEventArgs e)
 		{
-			EmitEvent(new SocketIOEvent("error", JSONObject.CreateStringObject(e.Message)));
+            #if SOCKET_IO_DEBUG
+			Debug.Log("Error: " + e.Message);
+			#endif
+			EmitEvent(new SocketIOEvent("error", JValue.CreateString(e.Message)));
 		}
 
 		private void OnClose(object sender, CloseEventArgs e)
