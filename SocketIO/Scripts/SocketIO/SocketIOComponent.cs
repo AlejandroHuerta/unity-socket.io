@@ -300,7 +300,7 @@ namespace SocketIO
 
 		private void EmitClose()
 		{
-			EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.DISCONNECT, 0, "/", -1, JValue.CreateNull()));
+			EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.DISCONNECT, 0, "/", -1, JValue.CreateString("")));
 			EmitPacket(new Packet(EnginePacketType.CLOSE));
 		}
 
@@ -324,7 +324,7 @@ namespace SocketIO
 			debugMethod.Invoke("[SocketIO] Send Ack id: " + id);
 			#endif
 
-            EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.ACK, 0, "/", id, JValue.CreateNull()));
+            EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.ACK, 0, "/", id, JValue.CreateString("")));
         }
 
 		private void OnOpen(object sender, EventArgs e)
