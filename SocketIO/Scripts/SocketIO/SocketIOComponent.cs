@@ -244,6 +244,10 @@ namespace SocketIO
 			ackList.Add(new Ack(packetId, action));
 		}
 
+        public void AddNamespace(string nsp) {
+            EmitAddNamespace(nsp);
+        }
+
 		#endregion
 
 		#region Private Methods
@@ -292,6 +296,10 @@ namespace SocketIO
 				}
 			}
 		}
+
+        private void EmitAddNamespace(string nsp) {
+            EmitPacket(new Packet(EnginePacketType.MESSAGE, SocketPacketType.CONNECT, 0, nsp, -1, JValue.CreateString("")));
+        }
 
 		private void EmitMessage(int id, string raw)
 		{
@@ -355,7 +363,7 @@ namespace SocketIO
 		private void HandleOpen(Packet packet)
 		{
 			#if SOCKET_IO_DEBUG
-			debugMethod.Invoke("[SocketIO] Socket.IO sid: " + packet.json["sid"].str);
+			debugMethod.Invoke("[SocketIO] Socket.IO sid: " + packet.json["sid"].ToString());
 			#endif
 			sid = packet.json["sid"].ToString();
 			EmitEvent("open");
@@ -374,6 +382,10 @@ namespace SocketIO
 		
 		private void HandleMessage(Packet packet)
 		{
+            if (packet.socketPacketType == SocketPacketType.CONNECT) {
+                Debug.Log(packet.nsp);
+            }
+
 			if(packet.json == null) { return; }
 
 			if(packet.socketPacketType == SocketPacketType.ACK){

@@ -26,7 +26,7 @@
  */
 #endregion
 
-#define SOCKET_IO_DEBUG			// Uncomment this for debug
+//#define SOCKET_IO_DEBUG			// Uncomment this for debug
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections;
