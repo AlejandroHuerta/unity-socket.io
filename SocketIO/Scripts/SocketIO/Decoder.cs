@@ -47,7 +47,7 @@ namespace SocketIO
                 Debug.Log("[SocketIO] Decoding: " + e.Data);
                 #endif
                 
-                if (e.Type == Opcode.BINARY) {
+                if (e.IsBinary) {
                     var rawString = Encoding.UTF8.GetString(e.RawData);
                     binaryPacket.json[1] = Encoding.UTF8.GetString(e.RawData);
 
