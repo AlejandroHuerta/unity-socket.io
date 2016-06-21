@@ -419,7 +419,10 @@ namespace SocketIO
 
 		private void OnClose(object sender, CloseEventArgs e)
 		{
-			EmitEvent("close");
+            #if SOCKET_IO_DEBUG
+            Debug.Log("Close: " + e.Reason);
+            #endif
+            EmitEvent("close");
 		}
 
 		private void EmitEvent(string type)
