@@ -99,12 +99,7 @@ namespace SocketIO
 			ackList = new List<Ack>();
 			sid = null;
 			packetId = 0;
-
-			ws = new WebSocket(url);
-			ws.OnOpen += OnOpen;
-			ws.OnMessage += OnMessage;
-			ws.OnError += OnError;
-			ws.OnClose += OnClose;
+            			
 			wsConnected = false;
 
 			eventQueueLock = new object();
@@ -139,7 +134,7 @@ namespace SocketIO
 				}
 			}
 
-			if(wsConnected != ws.IsAlive){
+			if(ws != null && wsConnected != ws.IsAlive){
 				wsConnected = ws.IsAlive;
 				if(wsConnected){
 					EmitEvent("connect");
@@ -172,6 +167,14 @@ namespace SocketIO
 		public void Connect()
 		{
 			connected = true;
+
+            if (ws == null) {
+                ws = new WebSocket(url);
+                ws.OnOpen += OnOpen;
+                ws.OnMessage += OnMessage;
+                ws.OnError += OnError;
+                ws.OnClose += OnClose;
+            }
 
 			socketThread = new Thread(RunSocketThread);
 			socketThread.Start(ws);
