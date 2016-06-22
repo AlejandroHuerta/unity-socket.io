@@ -432,7 +432,11 @@ namespace SocketIO
 
 		private void EmitEvent(SocketIOEvent ev)
 		{
-			if (!handlers.ContainsKey(ev.name)) { return; }
+            #if SOCKET_IO_DEBUG
+            debugMethod.Invoke("Calling handlers for event: " + ev.name);
+            #endif
+
+            if (!handlers.ContainsKey(ev.name)) { return; }
 			foreach (Action<SocketIOEvent> handler in this.handlers[ev.name]) {
 				try{
 					handler(ev);
