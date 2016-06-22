@@ -245,6 +245,9 @@ namespace SocketIO
 		}
 
         public void AddNamespace(string nsp) {
+            if (!nsp.StartsWith("/")) {
+                nsp = "/" + nsp;
+            }
             EmitAddNamespace(nsp);
         }
 
